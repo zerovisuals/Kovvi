@@ -3,7 +3,7 @@ import type { Browser } from 'playwright';
 import { launchChromium } from '@/server/inspect/chromium';
 import { inspectWebsite } from '@/server/inspect/inspect';
 import { deriveFindings, groupByClassification } from '@/server/inspect/findings';
-import { startFixtureServer, type FixtureServer } from '../setup/fixture-server';
+import { startFixtureServer, type FixtureServer } from '@/server/seed/fixture-server';
 
 /**
  * ACCEPTANCE CASE 14 — "External shop or booking provider: recognize a valid

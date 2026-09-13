@@ -27,20 +27,3 @@ export function SampleBanner() {
     </div>
   );
 }
-
-/** Row-level marker, for a sample record inside an otherwise real view. */
-export function SampleBadge({ className }: { className?: string }) {
-  return (
-    <span
-      className={[
-        'text-2xs border-line-strong text-ink-muted inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 font-mono tracking-wide uppercase',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
-      <span aria-hidden className="hatch h-2 w-2 rounded-[1px]" />
-      Sample
-    </span>
-  );
-}

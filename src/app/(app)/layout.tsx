@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { AppShell } from '@/components/layout/AppShell';
-import { requireTenant } from '@/server/auth/guards';
+import { requireSession, requireTenant } from '@/server/auth/guards';
 import { getDb } from '@/server/db/client';
 import { subscription, workspace } from '@/server/db/schema';
 import { AppBanner } from '@/components/layout/AppBanner';
@@ -14,6 +14,7 @@ import { AppBanner } from '@/components/layout/AppBanner';
  * navigation.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const session = await requireSession();
   const ctx = await requireTenant();
   const db = getDb();
 
@@ -33,7 +34,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell
-      workspaceName={current?.name ?? 'Workspace'}
+      workspaces={session.workspaces}
+      activeWorkspaceId={ctx.workspaceId}
       isSample={current?.kind === 'sample'}
       banner={
         billingNeedsAttention ? (

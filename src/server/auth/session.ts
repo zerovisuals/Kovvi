@@ -19,6 +19,18 @@ import type { TenantContext } from '../db/tenant';
  */
 
 export const SESSION_COOKIE = 'kovvi_session';
+
+/**
+ * Which workspace the user is currently looking at.
+ *
+ * A user has at least two — their own, and the sample one — and the brief's
+ * sample-vs-real separation is meaningless without a way to move between them.
+ * Stored in a cookie rather than the session row so switching does not
+ * invalidate other tabs, and validated against membership on every read: a
+ * forged cookie selects a workspace the user is not a member of, so the value
+ * is a hint, never an authorisation.
+ */
+export const WORKSPACE_COOKIE = 'kovvi_workspace';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const TOKEN_BYTES = 32;
 
@@ -32,10 +44,18 @@ export type SessionUser = {
   readonly name: string | null;
 };
 
+export type WorkspaceSummary = {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'real' | 'sample';
+};
+
 export type ActiveSession = {
   readonly user: SessionUser;
   readonly workspaceId: string;
   readonly role: 'owner' | 'member';
+  /** Everything the user can switch to. */
+  readonly workspaces: readonly WorkspaceSummary[];
 };
 
 /** Issues a session and sets the cookie. Returns the raw token for tests. */
@@ -87,22 +107,39 @@ export async function getSession(): Promise<ActiveSession | null> {
       email: user.email,
       name: user.name,
       workspaceId: membership.workspaceId,
+      workspaceName: workspace.name,
+      workspaceKind: workspace.kind,
       role: membership.role,
     })
     .from(session)
     .innerJoin(user, eq(session.userId, user.id))
     .innerJoin(membership, eq(membership.userId, user.id))
     .innerJoin(workspace, eq(membership.workspaceId, workspace.id))
-    .where(and(eq(session.tokenHash, hashToken(token)), gt(session.expiresAt, new Date())))
-    .limit(1);
+    .where(and(eq(session.tokenHash, hashToken(token)), gt(session.expiresAt, new Date())));
 
-  const row = rows[0];
-  if (!row) return null;
+  if (rows.length === 0) return null;
+
+  /**
+   * The requested workspace is honoured only if the user is actually a member
+   * of it. Because the candidate set comes from the membership join, a forged
+   * cookie simply finds no match and falls back — the cookie selects among
+   * workspaces the user already has, it never grants one.
+   */
+  const requested = store.get(WORKSPACE_COOKIE)?.value;
+  const active =
+    rows.find((row) => row.workspaceId === requested) ??
+    rows.find((row) => row.workspaceKind === 'real') ??
+    rows[0]!;
 
   return {
-    user: { id: row.userId, email: row.email, name: row.name },
-    workspaceId: row.workspaceId,
-    role: row.role,
+    user: { id: active.userId, email: active.email, name: active.name },
+    workspaceId: active.workspaceId,
+    role: active.role,
+    workspaces: rows.map((row) => ({
+      id: row.workspaceId,
+      name: row.workspaceName,
+      kind: row.workspaceKind,
+    })),
   };
 }
 

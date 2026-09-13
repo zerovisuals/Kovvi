@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { closeTestDb, createTestDb, type TestDb } from '../setup/pglite';
 import { seedRun, seedWorkspace } from '../setup/factories';
-import { startFixtureServer, type FixtureServer } from '../setup/fixture-server';
+import { startFixtureServer, type FixtureServer } from '@/server/seed/fixture-server';
 import { assessment, business, capture, finding, websiteCandidate } from '@/server/db/schema';
 import { enqueue } from '@/server/queue/queue';
 import { createWorker } from '@/server/queue/worker';

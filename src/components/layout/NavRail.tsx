@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { PRIMARY_NAV, SETTINGS_NAV } from './navigation';
 import { Mark } from '@/components/brand/Mark';
 import { Wordmark } from '@/components/brand/Wordmark';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import type { WorkspaceSummary } from '@/server/auth/session';
 
 /**
  * The navigation rail: 72px of icons, expanding to 232px on hover or focus.
@@ -17,7 +19,13 @@ import { Wordmark } from '@/components/brand/Wordmark';
  * The rail widens with a CSS transition on a token duration, so the
  * reduced-motion block in theme.css disables it along with everything else.
  */
-export function NavRail({ workspaceName }: { workspaceName: string }) {
+export function NavRail({
+  workspaces,
+  activeWorkspaceId,
+}: {
+  readonly workspaces: readonly WorkspaceSummary[];
+  readonly activeWorkspaceId: string;
+}) {
   const pathname = usePathname();
 
   return (
@@ -50,10 +58,8 @@ export function NavRail({ workspaceName }: { workspaceName: string }) {
         ))}
       </ul>
 
-      <div className="rule-t px-5 py-4">
-        <p className="text-ink-faint ease-out truncate font-mono text-2xs opacity-0 transition-opacity duration-calm group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">
-          {workspaceName}
-        </p>
+      <div className="rule-t ease-out overflow-hidden py-2 opacity-0 transition-opacity duration-calm group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">
+        <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} />
       </div>
     </nav>
   );

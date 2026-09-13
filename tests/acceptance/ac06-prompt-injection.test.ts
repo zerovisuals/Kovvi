@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestDb, createTestDb, type TestDb } from '../setup/pglite';
-import { startFixtureServer, type FixtureServer } from '../setup/fixture-server';
+import { startFixtureServer, type FixtureServer } from '@/server/seed/fixture-server';
 import { safeFetch } from '@/lib/net/safe-fetch';
 import { detectInjection, toPlainText, wrapUntrusted } from '@/lib/untrusted/wrap';
 import { evidence } from '@/server/db/schema';

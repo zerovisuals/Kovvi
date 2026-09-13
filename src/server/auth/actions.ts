@@ -5,7 +5,17 @@ import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../db/client';
-import { account, auditEvent, membership, subscription, user, workspace, workspacePreference } from '../db/schema';
+import {
+  account,
+  auditEvent,
+  membership,
+  subscription,
+  usageLedger,
+  user,
+  workspace,
+  workspacePreference,
+} from '../db/schema';
+import { PLAN_ALLOWANCES } from '../billing/usage';
 import { hashPassword, needsRehash, validatePassword, verifyPassword } from './password';
 import { createSession, destroySession, pruneExpiredSessions } from './session';
 
@@ -78,6 +88,23 @@ export async function signUp(_prev: unknown, formData: FormData): Promise<AuthRe
 
     // `absent` is the honest default: billing is not connected until it is.
     await tx.insert(subscription).values({ workspaceId: createdWorkspace.id, status: 'absent' });
+
+    /* Grant the period's allowance up front.
+       Allowance and BILLING are deliberately separate concerns: usage is
+       metered for real from the first minute, so nothing done before billing is
+       connected has to be redone afterwards. A workspace with no grant would
+       show a limit of zero and make the product look broken rather than
+       unbilled. */
+    for (const [unitType, units] of Object.entries(PLAN_ALLOWANCES.pro)) {
+      await tx.insert(usageLedger).values({
+        workspaceId: createdWorkspace.id,
+        kind: 'grant',
+        unitType: unitType as keyof typeof PLAN_ALLOWANCES.pro,
+        units,
+        idempotencyKey: `grant:${createdWorkspace.id}:${unitType}`,
+        note: 'Initial period allowance',
+      });
+    }
 
     await tx.insert(auditEvent).values({
       workspaceId: createdWorkspace.id,

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavRail } from './NavRail';
+import type { WorkspaceSummary } from '@/server/auth/session';
 import { MobileNav } from './MobileNav';
 import { SampleBanner } from '@/components/sample/SampleBanner';
 
@@ -15,21 +16,23 @@ import { SampleBanner } from '@/components/sample/SampleBanner';
 export function AppShell({
   children,
   evidence,
-  workspaceName,
+  workspaces,
+  activeWorkspaceId,
   isSample,
   banner,
 }: {
   readonly children: ReactNode;
   /** Rendered in the persistent right-hand rail on detail views. */
   readonly evidence?: ReactNode;
-  readonly workspaceName: string;
+  readonly workspaces: readonly WorkspaceSummary[];
+  readonly activeWorkspaceId: string;
   readonly isSample: boolean;
   /** Workspace-wide notices: disconnected account, inactive subscription. */
   readonly banner?: ReactNode;
 }) {
   return (
     <div className="bg-page flex min-h-dvh">
-      <NavRail workspaceName={workspaceName} />
+      <NavRail workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {isSample ? <SampleBanner /> : null}

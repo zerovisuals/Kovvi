@@ -3,7 +3,7 @@ import type { Browser } from 'playwright';
 import { launchChromium } from '@/server/inspect/chromium';
 import { inspectWebsite } from '@/server/inspect/inspect';
 import { deriveFindings } from '@/server/inspect/findings';
-import { startFixtureServer, type FixtureServer } from '../setup/fixture-server';
+import { startFixtureServer, type FixtureServer } from '@/server/seed/fixture-server';
 
 /**
  * ACCEPTANCE CASE 4 — "Blocked website inspection: inconclusive assessment, no
