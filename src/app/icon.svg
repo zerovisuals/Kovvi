@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!--
+    PLACEHOLDER FAVICON — replace alongside src/components/brand/Mark.tsx.
+
+    A favicon has no inherited colour context, so unlike Mark.tsx this file
+    cannot use currentColor and must carry explicit values. Keep it visually
+    identical to the Mark and legible at 16px.
+  -->
+  <rect width="24" height="24" rx="5" fill="#111111"/>
+  <path d="M8.5 16.5V7.5M8.5 12.25L15 7.5M8.5 12.25L15 16.5"
+        stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

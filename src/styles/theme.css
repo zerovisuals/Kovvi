@@ -1,0 +1,280 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   KOVVI THEME CONTRACT
+   ═══════════════════════════════════════════════════════════════════════════
+
+   This is the ONLY file in the repository permitted to contain a colour
+   literal, a font family name, a radius value, or a duration. Everything else
+   references the TIER 3 tokens at the bottom. `tests/guard/tokens.test.ts`
+   enforces that, so the rule cannot quietly rot.
+
+   ── Why three tiers ──────────────────────────────────────────────────────
+   Tailwind v4's plain `@theme` resolves values at BUILD time, so a token
+   declared there cannot be re-pointed at runtime and `[data-theme="dark"]`
+   would be inert. `@theme inline` (tier 3) instead passes our own CSS variable
+   through into the generated utility, so tier 2 can swap the whole palette at
+   runtime by redefining ordinary CSS variables.
+
+       TIER 1  raw values .............. the designer replaces this wholesale
+       TIER 2  semantic assignment ..... same token names in light and dark
+       TIER 3  utility generation ...... the only layer components may touch
+
+   ── Handover ─────────────────────────────────────────────────────────────
+   See BRAND-INTAKE.md. Everything below marked PLACEHOLDER is a neutral
+   stand-in with no design intent, present only so the app renders. Review a
+   supplied palette at /tokens (set KOVVI_DEV_ROUTES=1), which shows every
+   token in both themes with computed contrast ratios.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────────────────────
+   TIER 1 — RAW VALUES.  PLACEHOLDER. Replace this whole block.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Neutral ramp. 0 = lightest, 10 = darkest. Used by both themes; the dark
+     theme reads it from the other end. A supplied palette needs all eleven. */
+  --kv-n-0: oklch(1 0 0);
+  --kv-n-1: oklch(0.985 0 0);
+  --kv-n-2: oklch(0.962 0 0);
+  --kv-n-3: oklch(0.922 0 0);
+  --kv-n-4: oklch(0.87 0 0);
+  /* n-5 and n-6 are pinned by accessibility, not taste: n-5 is the lightest
+     value that still gives an input border 3:1 against the page, and n-6 the
+     lightest that gives 11px metadata 4.5:1 on a sunken toolbar. */
+  --kv-n-5: oklch(0.64 0 0);
+  --kv-n-6: oklch(0.52 0 0);
+  --kv-n-7: oklch(0.439 0 0);
+  --kv-n-8: oklch(0.318 0 0);
+  --kv-n-9: oklch(0.205 0 0);
+  --kv-n-10: oklch(0.145 0 0);
+
+  /* Accent. PLACEHOLDER: deliberately neutral, so an unset brand is obvious. */
+  --kv-a-base: oklch(0.32 0 0);
+  --kv-a-ink: oklch(0.99 0 0);
+  --kv-a-weak: oklch(0.94 0 0);
+
+  /* Signal hues. These carry MEANING, not decoration, and must stay mutually
+     distinguishable. Every status is also encoded by glyph, weight and label,
+     so the product remains readable if these are unset or indistinguishable. */
+  --kv-sig-positive: oklch(0.6 0.13 155);
+  /* Yellows lose contrast fastest on a white card; this is darkened to clear
+     3:1 there, which is the usual trap when a brand yellow arrives. */
+  --kv-sig-caution: oklch(0.62 0.14 75);
+  --kv-sig-critical: oklch(0.58 0.18 25);
+  --kv-sig-uncertain: oklch(0.62 0.05 290);
+  --kv-sig-sample: oklch(0.66 0.09 320);
+
+  /* Geometry */
+  --kv-radius-xs: 3px;
+  --kv-radius-sm: 5px;
+  --kv-radius-md: 8px;
+  --kv-radius-lg: 14px;
+  --kv-radius-full: 999px;
+
+  /* Motion. Every animation in the product reads these, so the
+     reduced-motion block in globals.css disables all of it at once. */
+  --kv-dur-instant: 90ms;
+  --kv-dur-quick: 150ms;
+  --kv-dur-calm: 260ms;
+  --kv-dur-slow: 420ms;
+  --kv-ease-out: cubic-bezier(0.22, 0.9, 0.28, 1);
+  --kv-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --kv-ease-spring: cubic-bezier(0.34, 1.42, 0.48, 1);
+
+  /* Type. `--kv-font-*-supplied` is set by src/styles/fonts.ts once real font
+     files exist; until then each falls back to a system stack. Mono is
+     load-bearing here: all evidence metadata is set in it. */
+  --kv-font-display: var(--kv-font-display-supplied, ui-sans-serif, system-ui, sans-serif);
+  --kv-font-text: var(--kv-font-text-supplied, ui-sans-serif, system-ui, sans-serif);
+  --kv-font-mono: var(--kv-font-mono-supplied, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   TIER 2 — SEMANTIC ASSIGNMENT.  Identical token names in both themes.
+   Dark is a true inversion of the ramp, not a tint.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root,
+[data-theme='light'] {
+  --kv-surface-page: var(--kv-n-1);
+  --kv-surface-card: var(--kv-n-0);
+  --kv-surface-sunken: var(--kv-n-2);
+  --kv-surface-raised: var(--kv-n-0);
+  --kv-surface-inverse: var(--kv-n-10);
+
+  --kv-ink-primary: var(--kv-n-10);
+  --kv-ink-secondary: var(--kv-n-7);
+  --kv-ink-tertiary: var(--kv-n-6);
+  --kv-ink-inverse: var(--kv-n-0);
+
+  --kv-line-hairline: color-mix(in oklch, var(--kv-n-4) 60%, transparent);
+  /* Input borders are UI-component boundaries under WCAG 1.4.11 and need 3:1,
+     which n-4 does not reach against the page. Hairline separators are
+     decorative and stay lighter. */
+  --kv-line-strong: var(--kv-n-5);
+
+  --kv-accent: var(--kv-a-base);
+  --kv-accent-ink: var(--kv-a-ink);
+  --kv-accent-weak: var(--kv-a-weak);
+
+  --kv-focus-ring: var(--kv-n-10);
+  --kv-shadow-card: 0 1px 2px oklch(0 0 0 / 0.05);
+  --kv-shadow-raised: 0 4px 16px -4px oklch(0 0 0 / 0.12);
+}
+
+[data-theme='dark'] {
+  --kv-surface-page: var(--kv-n-10);
+  --kv-surface-card: var(--kv-n-9);
+  --kv-surface-sunken: oklch(0.115 0 0);
+  --kv-surface-raised: var(--kv-n-8);
+  --kv-surface-inverse: var(--kv-n-0);
+
+  --kv-ink-primary: var(--kv-n-1);
+  --kv-ink-secondary: var(--kv-n-4);
+  --kv-ink-tertiary: var(--kv-n-5);
+  --kv-ink-inverse: var(--kv-n-10);
+
+  --kv-line-hairline: color-mix(in oklch, var(--kv-n-6) 42%, transparent);
+  --kv-line-strong: var(--kv-n-6);
+
+  --kv-accent: var(--kv-n-1);
+  --kv-accent-ink: var(--kv-n-10);
+  --kv-accent-weak: var(--kv-n-8);
+
+  --kv-focus-ring: var(--kv-n-1);
+  --kv-shadow-card: 0 1px 2px oklch(0 0 0 / 0.4);
+  --kv-shadow-raised: 0 4px 16px -4px oklch(0 0 0 / 0.6);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Wipe the stock Tailwind palette and font stacks. After this, `bg-blue-500`
+   generates NO utility at all — the token discipline is enforced by absence,
+   not by convention.
+   ─────────────────────────────────────────────────────────────────────────── */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --radius-*: initial;
+  --ease-*: initial;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   TIER 3 — UTILITY GENERATION. Components use ONLY these names.
+   `inline` is required: it passes the tier-2 variable through to the utility
+   so runtime theme switching works.
+   ─────────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  /* Surfaces */
+  --color-page: var(--kv-surface-page);
+  --color-card: var(--kv-surface-card);
+  --color-sunken: var(--kv-surface-sunken);
+  --color-raised: var(--kv-surface-raised);
+  --color-inverse: var(--kv-surface-inverse);
+
+  /* Ink */
+  --color-ink: var(--kv-ink-primary);
+  --color-ink-muted: var(--kv-ink-secondary);
+  --color-ink-faint: var(--kv-ink-tertiary);
+  --color-ink-inverse: var(--kv-ink-inverse);
+
+  /* Rules */
+  --color-line: var(--kv-line-hairline);
+  --color-line-strong: var(--kv-line-strong);
+
+  /* Accent */
+  --color-accent: var(--kv-accent);
+  --color-accent-ink: var(--kv-accent-ink);
+  --color-accent-weak: var(--kv-accent-weak);
+
+  /* Signals — meaning-bearing only; never the sole carrier of a status */
+  --color-positive: var(--kv-sig-positive);
+  --color-caution: var(--kv-sig-caution);
+  --color-critical: var(--kv-sig-critical);
+  --color-uncertain: var(--kv-sig-uncertain);
+  --color-sample: var(--kv-sig-sample);
+
+  --color-focus: var(--kv-focus-ring);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* Type */
+  --font-display: var(--kv-font-display);
+  --font-sans: var(--kv-font-text);
+  --font-mono: var(--kv-font-mono);
+
+  /* Editorial type scale. Dense metadata at the bottom, page titles at top. */
+  --text-2xs: 0.6875rem; /* 11px — provenance chips, table metadata */
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem; /* 12px — labels, badges */
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem; /* 13px — dense table body */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem; /* 15px — app body */
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem; /* 17px — reading measure */
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem; /* 22px — section titles */
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.875rem; /* 30px — page titles */
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2.75rem; /* 44px — marketing */
+  --text-3xl--line-height: 1.08;
+  --text-4xl: 4rem; /* 64px — marketing hero */
+  --text-4xl--line-height: 1.02;
+
+  /* Geometry */
+  --radius-xs: var(--kv-radius-xs);
+  --radius-sm: var(--kv-radius-sm);
+  --radius-md: var(--kv-radius-md);
+  --radius-lg: var(--kv-radius-lg);
+  --radius-full: var(--kv-radius-full);
+
+  /* Motion */
+  --ease-out: var(--kv-ease-out);
+  --ease-in-out: var(--kv-ease-in-out);
+  --ease-spring: var(--kv-ease-spring);
+  --duration-instant: var(--kv-dur-instant);
+  --duration-quick: var(--kv-dur-quick);
+  --duration-calm: var(--kv-dur-calm);
+  --duration-slow: var(--kv-dur-slow);
+
+  /* Shadows */
+  --shadow-card: var(--kv-shadow-card);
+  --shadow-raised: var(--kv-shadow-raised);
+
+  /* Layout constants — the asymmetric editorial grid */
+  --spacing-rail: 4.5rem; /* 72px collapsed navigation rail */
+  --spacing-rail-open: 14.5rem; /* 232px expanded */
+  --spacing-evidence: 25rem; /* 400px persistent evidence rail */
+  --spacing-row: 2.75rem; /* 44px table row */
+  --spacing-row-touch: 3.25rem; /* 52px touch row */
+  --spacing-measure: 34rem; /* reading measure cap */
+}
+
+/* Theme switching is driven entirely by `data-theme` on <html>, which the
+   no-flash script in layout.tsx sets before first paint from localStorage or
+   `prefers-color-scheme`. That keeps the variant a single simple selector. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ───────────────────────────────────────────────────────────────────────────
+   REDUCED MOTION
+   Part of the motion contract, so it lives with the tokens it zeroes. Because
+   every duration in the codebase is a token rather than a literal, redefining
+   four variables disables every transition and animation in the product. The
+   blanket override below is the belt to that braces, covering third-party CSS
+   and anything that slipped past the token guard.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --kv-dur-instant: 1ms;
+    --kv-dur-quick: 1ms;
+    --kv-dur-calm: 1ms;
+    --kv-dur-slow: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

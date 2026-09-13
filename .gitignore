@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# local database (PGlite data directory, served over the wire protocol)
+.data/
+
+# captured screenshots and DOM snapshots when using the filesystem blob backend
+.blobs/
+
+# environment — never commit credentials. .env.example is the documented shape.
+.env
+.env.local
+.env.*.local
+
+# test output
+coverage/
+test-results/
+playwright-report/
+
+# design references supplied by the designer. Kept out of git by default
+# because they are often large binaries and sometimes third-party material;
+# remove these lines if they should be versioned with the project.
+design-references/*
+!design-references/README.md
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# scratch
+.scratch/
