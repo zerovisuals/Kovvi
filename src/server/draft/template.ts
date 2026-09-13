@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describeAge, type DatePrecision } from '../evidence/dates';
+import { describeAge, freshnessWindowDays, type DatePrecision } from '../evidence/dates';
 
 /**
  * DETERMINISTIC OUTREACH DRAFTING
@@ -36,6 +36,8 @@ export type DraftEvent = {
   readonly date: Date | null;
   readonly precision: DatePrecision;
   readonly expired: boolean;
+  /** Drives the freshness window; defaults to the generic 90 days. */
+  readonly type?: string;
 };
 
 export type DraftInput = {
@@ -82,11 +84,31 @@ export function draftFromTemplate(input: DraftInput): Draft {
   /* ── Why now ───────────────────────────────────────────────────────────── */
   let opener: string;
 
-  if (input.event && !input.event.expired && input.event.date) {
+  /**
+   * An event is only a reason to write if it is recent. The evidence row's own
+   * expiry usually settles that, but it is set from when the PAGE was fetched —
+   * so a page retrieved this morning that mentions a 1987 opening yields fresh
+   * evidence of an ancient fact. Checking the event's own date here is what
+   * keeps "why now" meaning now.
+   */
+  const eventAgeDays =
+    input.event?.date === null || input.event?.date === undefined
+      ? null
+      : (Date.now() - input.event.date.getTime()) / 86_400_000;
+
+  const eventTooOld =
+    eventAgeDays !== null && eventAgeDays > freshnessWindowDays(input.event?.type ?? 'other');
+
+  if (input.event && !input.event.expired && !eventTooOld && input.event.date) {
     const age = describeAge(input.event.date, input.event.precision);
     grounding.push(input.event.evidenceId);
     opener = `I saw ${input.businessName} ${lowerFirst(input.event.title)} — ${age}.`;
   } else {
+    if (eventTooOld) {
+      omissions.push(
+        'The dated event was left out because it is too old to be a reason for writing now. Opening with something that happened years ago is the tell that a message was assembled rather than written.',
+      );
+    }
     if (input.event?.expired) {
       omissions.push(
         'The dated event was left out: its evidence is past its freshness window, and referring to something that may no longer be true is worse than not mentioning it.',
@@ -116,14 +138,25 @@ export function draftFromTemplate(input: DraftInput): Draft {
     const first = assertable[0]!;
     grounding.push(first.id);
 
-    const observation =
-      first.classification === 'objective_defect'
-        ? `One thing I noticed on your site: ${lowerFirst(first.summary)}`
-        : `One thing that stood out on your site: ${lowerFirst(first.summary)}`;
+    const quoted = oneSentence(first.summary);
 
-    paragraphs.push(
-      `${observation} I had a look on both desktop and a phone before writing, so this is what I actually saw rather than a guess.`,
-    );
+    if (quoted === null) {
+      // The excerpt is a slab of page text rather than a statement. Pasting it
+      // into a message would read as a scrape, which is what it would be.
+      omissions.push(
+        'A site observation was found but not quoted: the extracted text was not a single readable statement, and pasting a block of page copy into a message reads exactly like the scrape it is.',
+      );
+      paragraphs.push('I had a look at the site on both desktop and a phone before writing.');
+    } else {
+      const observation =
+        first.classification === 'objective_defect'
+          ? `One thing I noticed on your site: ${lowerFirst(quoted)}`
+          : `One thing that stood out on your site: ${lowerFirst(quoted)}`;
+
+      paragraphs.push(
+        `${observation} I had a look on both desktop and a phone before writing, so this is what I actually saw rather than a guess.`,
+      );
+    }
   } else if (input.findings.length === 0) {
     // Deliberately says so, rather than inventing an angle.
     paragraphs.push(
@@ -166,15 +199,47 @@ export function draftFromTemplate(input: DraftInput): Draft {
   const body = paragraphs.join('\n\n');
 
   return {
-    subject: input.event && !input.event.expired
-      ? `${input.businessName} — quick note`
-      : `Quick note about your website`,
+    // The named subject belongs to a message that opens with a real reason to
+    // write. Without one it would promise a specificity the body does not have.
+    subject:
+      input.event && !input.event.expired && !eventTooOld
+        ? `${input.businessName} — quick note`
+        : `Quick note about your website`,
     body,
     bodyHash: createHash('sha256').update(body).digest('hex'),
     groundingEvidenceIds: [...new Set(grounding)],
     drafterVersion: DRAFTER_VERSION,
     omissions,
   };
+}
+
+/**
+ * The first sentence of an extracted excerpt, or null if there isn't one worth
+ * quoting.
+ *
+ * Extractors return whatever the page gave them, which is frequently a run of
+ * navigation text, an address and a phone number with no sentence in it. A
+ * draft may quote a statement; it may not paste a paragraph of someone's
+ * website back at them.
+ */
+function oneSentence(text: string): string | null {
+  const collapsed = text.replace(/\s+/g, ' ').trim();
+  const [first] = collapsed.split(/(?<=[.!?])\s+/);
+  if (!first) return null;
+
+  const sentence = first.endsWith('.') || first.endsWith('!') || first.endsWith('?')
+    ? first
+    : `${first}.`;
+
+  // Too short to say anything; too long to be one sentence someone wrote.
+  if (sentence.length < 20 || sentence.length > 120) return null;
+  // Separator runs are how page titles and navigation get concatenated. They
+  // are never how a person writes a sentence about their own website.
+  if (/\s[—|·•]\s/.test(sentence)) return null;
+  // An excerpt carrying an address or a phone number is page furniture.
+  if (/@|https?:\/\/|\+?\d[\d ()-]{7,}/.test(sentence)) return null;
+
+  return sentence;
 }
 
 function lowerFirst(text: string): string {

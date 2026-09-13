@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { boolean, index, integer, pgTable, text } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import { workspace } from './tenancy';
 import { confidence, moduleId } from './enums';
 import { createdAt, id, timestamptz, updatedAt } from './columns';
@@ -48,7 +48,10 @@ export const serviceProfile = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [index('service_profile_workspace_idx').on(table.workspaceId)],
+  // One profile per workspace. The whole product reads it with `limit(1)` and
+  // writes it as an upsert, so the uniqueness is already assumed everywhere —
+  // declaring it here is what makes the assumption true rather than lucky.
+  (table) => [uniqueIndex('service_profile_workspace_unique').on(table.workspaceId)],
 );
 
 export const portfolioProject = pgTable(

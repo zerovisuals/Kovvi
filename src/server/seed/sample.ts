@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
   business,
@@ -14,6 +14,13 @@ import {
   websiteCandidate,
   workspace,
   workspacePreference,
+  serviceProfile,
+  portfolioProject,
+  conversation,
+  conversationMessage,
+  identityConflict,
+  user,
+  opportunity as opportunityTable,
 } from '../db/schema';
 import { safeFetch, hashUrl } from '@/lib/net/safe-fetch';
 import { detectInjection, toPlainText } from '@/lib/untrusted/wrap';
@@ -23,7 +30,8 @@ import { deriveFindings, RULESET_VERSION } from '../inspect/findings';
 import { assessment, blobObject, capture, finding } from '../db/schema';
 import { captureKey, getBlobStore } from '../storage/blob';
 import { scoreOpportunity } from '../rank/score';
-import { upsertOpportunity } from '../db/repo/opportunity';
+import { listOpportunities, upsertOpportunity } from '../db/repo/opportunity';
+import { prepareCampaign } from '../outreach/prepare';
 import { launchChromium } from '../inspect/chromium';
 import { startFixtureServer } from './fixture-server';
 import type { Browser } from 'playwright';
@@ -53,6 +61,8 @@ export type SeedResult = {
   readonly opportunities: number;
   readonly assessments: number;
   readonly captures: number;
+  readonly drafts: number;
+  readonly conversations: number;
 };
 
 type Prospect = {
@@ -164,6 +174,8 @@ export async function seedSampleWorkspace(db: Database, userId: string): Promise
       })
       .returning({ id: researchRun.id });
 
+    // Needed after the loop, to wire the two same-named businesses together.
+    const byFixture = new Map<string, string>();
     let assessments = 0;
     let captures = 0;
     let opportunities = 0;
@@ -214,6 +226,7 @@ export async function seedSampleWorkspace(db: Database, userId: string): Promise
         .returning({ id: business.id });
 
       const businessId = biz!.id;
+      byFixture.set(prospect.site, businessId);
 
       /* ── Evidence, quoted from the page we actually fetched ──────────── */
       const parsed = parseDate(text);
@@ -401,7 +414,33 @@ export async function seedSampleWorkspace(db: Database, userId: string): Promise
       .set({ unitsFinalised: assessments, unitsReserved: assessments })
       .where(eq(researchRun.id, run!.id));
 
-    return { workspaceId, opportunities, assessments, captures };
+    /* An UNRESOLVED identity conflict, seeded deliberately.
+       `twins-a` and `twins-b` are two different businesses that normalise to
+       the same name key. Nothing in the product can tell them apart, so the
+       conflict is recorded as open and outreach to both is blocked — the state
+       the brief asks for, reached the way it would really be reached rather
+       than written into a row by hand. */
+    const twinA = byFixture.get('twins-a');
+    const twinB = byFixture.get('twins-b');
+
+    if (twinA && twinB) {
+      await db.insert(identityConflict).values({
+        businessId: twinA,
+        otherBusinessId: twinB,
+        status: 'open',
+        reason:
+          'Two businesses normalise to the same name and neither has a confirmed domain. Telling them apart needs something only you can supply.',
+      });
+
+      await db
+        .update(opportunityTable)
+        .set({ blockedReason: 'identity_conflict' })
+        .where(inArray(opportunityTable.businessId, [twinA, twinB]));
+    }
+
+    const outreach = await seedOutreach(db, { workspaceId, userId });
+
+    return { workspaceId, opportunities, assessments, captures, ...outreach };
   } finally {
     await browser?.close().catch(() => {});
     await server.close();
@@ -409,4 +448,123 @@ export async function seedSampleWorkspace(db: Database, userId: string): Promise
     if (previousLoopback === undefined) delete process.env.KOVVI_SSRF_ALLOW_LOOPBACK;
     else process.env.KOVVI_SSRF_ALLOW_LOOPBACK = previousLoopback;
   }
+}
+
+/**
+ * The outreach half of the sample.
+ *
+ * Drafts are produced by the REAL drafter against the evidence the run above
+ * genuinely collected, so what the user reads in the sample review screen is
+ * the same prose the same code would write for their own research — including
+ * the messages it refuses to write, and its stated omissions.
+ *
+ * The sample workspace cannot send. That is enforced in dispatch, not here, so
+ * the sample exercises the block rather than avoiding it. The one seeded reply
+ * is recorded as a manual log, which is what it would be.
+ */
+async function seedOutreach(
+  db: Database,
+  ctx: { readonly workspaceId: string; readonly userId: string },
+): Promise<{ readonly drafts: number; readonly conversations: number }> {
+  const tenant = { workspaceId: ctx.workspaceId, userId: ctx.userId, role: 'owner' as const };
+
+  const profileValues = {
+    workspaceId: ctx.workspaceId,
+    headline: 'Ecommerce and brand sites for small independent businesses',
+    services: ['ecommerce redesign', 'brand site build', 'mobile checkout'],
+    regions: ['PT', 'IE', 'GB'],
+    languages: ['en', 'pt'],
+    exclusions: [] as string[],
+    minProjectPriceCents: 250_000,
+    confirmedAt: new Date(),
+  };
+
+  await db
+    .insert(serviceProfile)
+    .values(profileValues)
+    .onConflictDoUpdate({ target: serviceProfile.workspaceId, set: profileValues });
+
+  const existingProjects = await db
+    .select({ id: portfolioProject.id })
+    .from(portfolioProject)
+    .where(eq(portfolioProject.workspaceId, ctx.workspaceId));
+
+  if (existingProjects.length === 0) {
+    await db.insert(portfolioProject).values({
+      workspaceId: ctx.workspaceId,
+      url: 'https://example.com/work/atelier-nord',
+      title: 'Atelier Nord',
+      role: 'Design and build',
+      summary: 'Small-batch clothing label. Mobile-first storefront and checkout.',
+      industryTags: ['fashion', 'local_services'],
+      isRepresentative: true,
+    });
+  }
+
+  const [account] = await db
+    .select({ name: user.name, email: user.email })
+    .from(user)
+    .where(eq(user.id, ctx.userId))
+    .limit(1);
+
+  // The sample writes in the user's own name, because that is whose name the
+  // real messages would carry. A placeholder here would make the sample read
+  // like a template when the point of it is that it does not.
+  const sender = account?.name?.trim() || account?.email?.split('@')[0] || 'me';
+
+  const shortlist = await listOpportunities(db, tenant);
+  const candidates = shortlist
+    .filter((row) => !row.identityConflictOpen && row.hasContact)
+    .slice(0, 4)
+    .map((row) => row.id);
+
+  const prepared = await prepareCampaign(db, tenant, {
+    name: 'Sample campaign — Porto and Bristol',
+    opportunityIds: candidates,
+    senderName: sender,
+  });
+
+  let conversations = 0;
+
+  const first = prepared.prepared[0];
+  if (first) {
+    const [thread] = await db
+      .insert(conversation)
+      .values({
+        workspaceId: ctx.workspaceId,
+        opportunityId: first.opportunityId,
+        channel: 'email',
+        lastMessageAt: new Date(),
+      })
+      .returning({ id: conversation.id });
+
+    await db.insert(conversationMessage).values([
+      {
+        workspaceId: ctx.workspaceId,
+        conversationId: thread!.id,
+        direction: 'manual_log',
+        body: 'Sent by hand from your own mail client, then logged here.',
+        sourceMessageId: first.messageId,
+        occurredAt: new Date(Date.now() - 3 * 86_400_000),
+      },
+      {
+        workspaceId: ctx.workspaceId,
+        conversationId: thread!.id,
+        direction: 'inbound',
+        body: 'Thanks for getting in touch. We are looking at the site early next year — can you send over what a redesign would involve?',
+        // Left unclassified on purpose. It reads like interest; it may not be,
+        // and the product will not decide that on the user's behalf.
+        occurredAt: new Date(Date.now() - 86_400_000),
+      },
+    ]);
+
+    await db
+      .update(opportunityTable)
+      .set({ stage: 'replied' })
+      .where(eq(opportunityTable.id, first.opportunityId));
+
+    conversations = 1;
+  }
+
+  return { drafts: prepared.prepared.length, conversations };
 }

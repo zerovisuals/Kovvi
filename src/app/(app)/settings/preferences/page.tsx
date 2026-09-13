@@ -1,18 +1,41 @@
 import type { Metadata } from 'next';
+import { connection } from 'next/server';
+import { eq } from 'drizzle-orm';
 import { PageBody, PageHeader } from '@/components/layout/PageHeader';
-import { NotBuiltYet } from '@/components/state/NotBuiltYet';
+import { PreferencesForm } from '@/components/settings/PreferencesForm';
 import { requireTenant } from '@/server/auth/guards';
+import { getDb } from '@/server/db/client';
+import { workspacePreference } from '@/server/db/schema';
 
 export const metadata: Metadata = { title: 'Preferences' };
 
-export default async function Page() {
-  await requireTenant('/settings/preferences');
+export default async function PreferencesPage() {
+  const ctx = await requireTenant('/settings/preferences');
+  await connection();
+
+  const [row] = await getDb()
+    .select()
+    .from(workspacePreference)
+    .where(eq(workspacePreference.workspaceId, ctx.workspaceId))
+    .limit(1);
 
   return (
     <>
-      <PageHeader title="Preferences" lede="Theme, timezone, language and whether you are currently taking work." />
+      <PageHeader
+        title="Preferences"
+        lede="How the product behaves for you, including whether it should be looking for work at all right now."
+      />
+
       <PageBody>
-        <NotBuiltYet what="Preferences" plannedFor="phase 9" />
+        <PreferencesForm
+          values={{
+            timezone: row?.timezone ?? 'UTC',
+            locale: row?.locale ?? 'en',
+            capacity: row?.capacity ?? 'open',
+            reducedMotion: row?.reducedMotion ?? false,
+            defaultRunCap: row?.defaultRunCap ?? 25,
+          }}
+        />
       </PageBody>
     </>
   );

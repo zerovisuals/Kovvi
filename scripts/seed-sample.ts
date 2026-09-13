@@ -37,7 +37,8 @@ try {
 
   console.log(
     `[seed] done: ${result.opportunities} opportunities, ${result.assessments} assessments, ` +
-      `${result.captures} screenshots (workspace ${result.workspaceId})`,
+      `${result.captures} screenshots, ${result.drafts} drafts, ` +
+      `${result.conversations} conversation (workspace ${result.workspaceId})`,
   );
 } catch (error) {
   console.error('[seed] failed:', error instanceof Error ? error.message : error);
